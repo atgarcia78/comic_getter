@@ -18,16 +18,12 @@ download_directory_path = "/Users/antoniotorres/Documents/comics"
 def makepdf(issue_data):
 
     download_path = Path(f"{download_directory_path}/"
-                             f"{issue_data[1]}/{issue_data[2]}")
+                             f"{issue_data[0]}/{issue_data[1]}")
     pdf_path = Path(f"{download_directory_path}/"
-                             f"{issue_data[1]}/pdf")
+                             f"{issue_data[0]}/pdf")
 
     pdf_path.mkdir(parents=True, exist_ok=True)
- 
-    #print(str(basename))
-    #print(str(dirname))                
- 
-    #print(converted_file_directory)
+
     # Such kind of lambda functions and breaking is dangerous...
     im_files = [image_files for image_files in sorted(glob.glob(str(download_path) + "/" + "*.jpg"),
                                                         key=lambda f: int(re.sub('\D', '', f)))]
