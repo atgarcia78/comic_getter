@@ -27,7 +27,7 @@ def makepdf(issue_data):
     # Such kind of lambda functions and breaking is dangerous...
     im_files = [image_files for image_files in sorted(glob.glob(str(download_path) + "/" + "*.jpg"),
                                                         key=lambda f: int(re.sub('\D', '', f)))]
-    pdf_file_name = Path(f"{pdf_path}/{issue_data[1]}_{issue_data[2]}.pdf")
+    pdf_file_name = Path(f"{pdf_path}/{issue_data[0]}_{issue_data[1]}.pdf")
     #print(pdf_file_name)
     #sprint(im_files)
     try:
