@@ -64,6 +64,7 @@ parser.add_argument('-i', '--issue', type=str, default=[""],
 parser.add_argument('-n', '--nodownload', action='store_true',
                     help='not download')
 parser.add_argument('-v', '--verbose', action='store_true')
+parser.add_argument('-p', '--pdf', nargs=2, type=str)
 
 args = parser.parse_args()
 
@@ -72,6 +73,11 @@ if not ConfigJSON().config_exists():
     msg = "\nThere was no config.json file so let's create one.\n"
     print(msg)
     ConfigJSON().config_create()
+    sys.exit()
+
+if args.pdf:
+    data = [args.pdf[0], args.pdf[1]]
+    makepdf(data)
     sys.exit()
 
 if args.config:
