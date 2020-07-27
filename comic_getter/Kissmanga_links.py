@@ -51,15 +51,6 @@ class Kissmanga_Comic:
         comic_issue_name = [name_and_issue[1], name_and_issue[2], issue_link]
         return comic_issue_name
 
-    def is_comic_downloaded(self, comic_issue_name):
-        '''Checks if comic has already been downloaded.'''
-
-        download_path = Path(f"{self.download_directory_path}/{comic_issue_name[1]}/{comic_issue_name[2]}")
-        if os.path.exists(download_path):
-            print(f"{comic_issue_name[2]} has already been downloaded.")
-            return True
-        else:
-            return False  
 
     def get_issues_links(self):
         '''Gather all individual issues links from main link.'''
@@ -96,8 +87,7 @@ class Kissmanga_Comic:
             print(e)
             return
         
-    
-    
+        
     def get_pages_links(self, issue_link):
         ''' Gather the links of each page of an issue.'''
 

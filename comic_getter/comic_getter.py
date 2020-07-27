@@ -95,7 +95,7 @@ if args.input:
         comic = Kissmanga_Comic(url)
     else:
         sys.exit("URL no soportada")  
-          
+
     issues_links = list(comic.get_issues_links())
 
     if not issues_links:
