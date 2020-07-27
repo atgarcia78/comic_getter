@@ -63,7 +63,7 @@ class Kissmanga_Comic:
             #    (By.CLASS_NAME, "listing")))
             # # The whole html code is downloaded.
             element = wait.until(ec.visibility_of_element_located(
-                (By.LINK_TEXT, "kissmanga.com")))
+                (By.LINK_TEXT, "Read online manga - kissmanga.com")))
             body = self.driver.find_element_by_tag_name("body")
             body = str(body.get_attribute('innerHTML'))
             
@@ -88,7 +88,7 @@ class Kissmanga_Comic:
             return
         
         
-    def get_pages_links(self, issue_link):
+    def get_pages_links(self, i, issue_link):
         ''' Gather the links of each page of an issue.'''
 
         info = []
@@ -116,8 +116,10 @@ class Kissmanga_Comic:
         issue_data = []
         try:
             self.driver.get(issue_link)
+            if (i==0):
+                w = input("Resuelve captcha y pulsa ENTER")
             wait = WebDriverWait(self.driver, 3600)
-            #wait.until(ec.presence_of_element_located(By.ID,"divImage"))
+            element = wait.until(ec.visibility_of_element_located( (By.ID,"divImage" ) ))
 
             
                 # # An option to load all pages of the issue in the same tab is selected.
@@ -126,8 +128,9 @@ class Kissmanga_Comic:
                 # time.sleep(2)
                 
                 #An explicit wait is trigger to wait for imgLoader to disappear
-            wait.until(ec.invisibility_of_element((By.ID, "imgLoader")))
-            element = self.driver.find_element_by_id("divImage")
+            #wait.until(ec.invisibility_of_element((By.ID, "imgLoader")))
+            #element = self.driver.find_element_by_id("divImage")
+    
             html_page = element.get_attribute('innerHTML')
 
             generic_page_link = re.compile(
@@ -141,6 +144,9 @@ class Kissmanga_Comic:
         
         except Exception as e:
             print(e)
+            self.driver.switch_to_window(main_window)
+            self.driver.close()
+            self.driver.switch_to_window(new_window)
             return
             
 

@@ -98,7 +98,7 @@ class RCO_Comic:
         
     
     
-    def get_pages_links(self, issue_link):
+    def get_pages_links(self, i, issue_link):
         ''' Gather the links of each page of an issue.'''
 
         info = []
@@ -127,18 +127,14 @@ class RCO_Comic:
         try:
             self.driver.get(issue_link)
             wait = WebDriverWait(self.driver, 3600)
-            #wait.until(ec.presence_of_element_located(By.ID,"divImage"))
-
-            
-                # # An option to load all pages of the issue in the same tab is selected.
-                # select = Select(self.driver.find_element_by_id('selectReadType'))
-                # select.select_by_index(1)
-                # time.sleep(2)
-                
-                #An explicit wait is trigger to wait for imgLoader to disappear
-            wait.until(ec.invisibility_of_element((By.ID, "imgLoader")))
-            element = self.driver.find_element_by_id("divImage")
-            html_page = element.get_attribute('innerHTML')
+            #wait until the javascript with the images information is downloaded. And use the links
+            #in the javascript itself, so there's no need to wait to download every image 
+            elements = []
+            elements = wait.until(ec.presence_of_all_elements_located( (By.TAG_NAME,"script") ))
+            for i, tag in enumerate(elements):
+                html_page = tag.get_attribute('innerHTML')
+                if "lstImages" in html_page:
+                    break 
 
             generic_page_link = re.compile(
                 r'(?<=")https://2\.bp\.blogspot\.com/.+?(?=")', re.I)
@@ -151,6 +147,9 @@ class RCO_Comic:
         
         except Exception as e:
             print(e)
+            self.driver.switch_to_window(main_window)
+            self.driver.close()
+            self.driver.switch_to_window(new_window)
             return
             
 

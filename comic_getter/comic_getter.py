@@ -15,6 +15,7 @@ from RCO_links import RCO_Comic
 from Kissmanga_links import Kissmanga_Comic
 
 download_directory_path = "/Users/antoniotorres/Documents/comics"
+_COMICTYPE=""
 
 def makepdf(issue_data):
 
@@ -91,8 +92,10 @@ if args.input:
     url = args.input
     if "readcomiconline" in url:
         comic = RCO_Comic(url)
+        _COMICTYPE="RCO"
     elif "kissmanga" in url:
         comic = Kissmanga_Comic(url)
+        _COMICTYPE="KISSMANGA"
     else:
         sys.exit("URL no soportada")  
 
@@ -122,7 +125,7 @@ if args.input:
 
     issue_data = []
     for i, issue in enumerate(issues_links):
-        id = comic.get_pages_links(issue)
+        id = comic.get_pages_links(i, issue)
         issue_data.append(id)
 
     if args.verbose:
