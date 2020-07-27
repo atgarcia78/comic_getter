@@ -12,6 +12,7 @@ import re
 
 from config_generator import ConfigJSON
 from RCO_links import RCO_Comic
+from Kissmanga_links import Kissmanga_Comic
 
 download_directory_path = "/Users/antoniotorres/Documents/comics"
 
@@ -88,7 +89,13 @@ if args.input:
     issues_links = []
     #Download comic from link.
     url = args.input
-    comic = RCO_Comic(url)
+    if "readcomiconline" in url:
+        comic = RCO_Comic(url)
+    elif "kissmanga" in url:
+        comic = Kissmanga_Comic(url)
+    else:
+        sys.exit("URL no soportada")  
+          
     issues_links = list(comic.get_issues_links())
 
     if not issues_links:
