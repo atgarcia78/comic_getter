@@ -33,6 +33,8 @@ class RCO_Comic:
         self.driver_path = data["chromedriver_path"]
         self.download_directory_path = data["download_dir"]
         options = Options()
+        options.page_load_strategy = 'eager'
+        #options.headless=True
         #options.add_extension("/Users/antoniotorres/Downloads/extension_1_1_0_0.crx")
         #options.add_extension("/Users/antoniotorres/Downloads/extension_1_27_10_0.crx")
         self.driver = webdriver.Chrome(executable_path=self.driver_path,chrome_options=options)
