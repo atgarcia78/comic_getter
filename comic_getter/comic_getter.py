@@ -61,7 +61,7 @@ parser.add_argument('-f','--first', type=int, default="0",
                     help='1st issue of subset')
 parser.add_argument('-l','--last', type=int, default="0",
                     help='last issue of subset')
-parser.add_argument('-i', '--issue', type=str, default=[""],
+parser.add_argument('-i', '--issue', type=int, default="0",
                     help='specific issue(s)')
 parser.add_argument('-n', '--nodownload', action='store_true',
                     help='not download')
@@ -121,6 +121,12 @@ if args.input:
         issues_links = issues_links[first-1:last]
         if args.verbose:
             print("Tras first last")
+            print(issues_links)
+    
+    if args.issue:
+        issues_links = issues_links[args.issue-1:args.issue]
+        if args.verbose:
+            print("Un issue")
             print(issues_links)
 
     issue_data = []

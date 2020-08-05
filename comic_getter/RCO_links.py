@@ -45,9 +45,10 @@ class RCO_Comic:
         '''Finds out comic and issue name from link.'''
         
         # Re module is used to get issue and comic name.
-        generic_comic_name = re.compile(r"(?<=comic/)(.+?)/(.+?)(?=\?)", re.I)
+        
+        generic_comic_name = re.compile(r"(?<=Comic/)(.+?)/(.+?)(?=\?)", re.I)
         name_and_issue = re.search(generic_comic_name, issue_link)
-
+        
         # comic_issue_names[0] is the comic's link name, comic_issue_names[1] is
         # the comic name and comic_issue_names[2] is the issues name.
         comic_issue_name = [name_and_issue[1], name_and_issue[2], issue_link]
