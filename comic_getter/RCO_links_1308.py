@@ -8,7 +8,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as ec
-
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 from pathlib import Path
@@ -34,29 +33,13 @@ class RCO_Comic:
         self.driver_path = data["chromedriver_path"]
         self.download_directory_path = data["download_dir"]
         options = Options()
-        #options.page_load_strategy = 'eager'
-        options.headless = True
-        options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36'")
+        options.page_load_strategy = 'eager'
+        #options.headless=True
         #options.add_extension("/Users/antoniotorres/Downloads/extension_1_1_0_0.crx")
         #options.add_extension("/Users/antoniotorres/Downloads/extension_1_27_10_0.crx")
-        self.driver = webdriver.Chrome(executable_path=self.driver_path,options=options)
-        #self.driver.set_window_size(1,1)
-        self.driver.implicitly_wait(15) # seconds
+        self.driver = webdriver.Chrome(executable_path=self.driver_path,chrome_options=options)
+        self.driver.set_window_size(1,1)
         self.main_window = None
-        print("title:" + self.driver.title)
-        i = 0
-        while i < 5:
-            try:
-                self.driver.get(self.main_link)
-                wait = WebDriverWait(self.driver, 30)
-                wait.until(ec.title_contains("comic"))
-                assert "comic" in self.driver.title
-                break
-            except Exception as e:
-                i += 1
-        print(self.driver.title)
-        if not "comic" in self.driver.title:
-            raise Exception("Try again")
  
     def get_comic_and_issue_name(self, issue_link):
         '''Finds out comic and issue name from link.'''
@@ -71,26 +54,31 @@ class RCO_Comic:
         comic_issue_name = [name_and_issue[1], name_and_issue[2], issue_link]
         return comic_issue_name
 
+    def is_comic_downloaded(self, comic_issue_name):
+        '''Checks if comic has already been downloaded.'''
+
+        download_path = Path(f"{self.download_directory_path}/{comic_issue_name[1]}/{comic_issue_name[2]}")
+        if os.path.exists(download_path):
+            print(f"{comic_issue_name[2]} has already been downloaded.")
+            return True
+        else:
+            return False  
 
     def get_issues_links(self):
         '''Gather all individual issues links from main link.'''
 
-        #self.driver.get(self.main_link)
+        self.driver.get(self.main_link)
         # A 60 second margin is given for rowser to bypass cloudflare.
         try:
-            #wait = WebDriverWait(self.driver, 120)
+            wait = WebDriverWait(self.driver, 60)
             # element = wait.until(ec.presence_of_element_located(
             #    (By.CLASS_NAME, "listing")))
             # # The whole html code is downloaded.
-            #strf = ".listing > tbody:nth-child(1)"
-            #element = wait.until(ec.title_contains("comic"))
-            #assert "comic" in self.driver.title
-            #print(self.driver.title)
-
-            body = self.driver.find_element_by_class_name("listing").get_attribute('innerHTML')
-            #body = str(body.get_attribute('innerHTML'))
-            #body = str(element.get_attribute('innerHTML'))
-            #print(body)
+            element = wait.until(ec.visibility_of_element_located(
+                (By.LINK_TEXT, "ReadComicOnline.to")))
+            body = self.driver.find_element_by_tag_name("body")
+            body = str(body.get_attribute('innerHTML'))
+            
             # table = self.driver.find_element_by_class_name("listing")
             # self.main_window = self.driver.current_window_handle
             # body = table.get_attribute('innerHTML')
@@ -113,7 +101,7 @@ class RCO_Comic:
         
     
     
-    def get_pages_links(self, issue_link):
+    def get_pages_links(self, i, issue_link):
         ''' Gather the links of each page of an issue.'''
 
         info = []
@@ -123,64 +111,49 @@ class RCO_Comic:
         
 
         main_window = self.driver.current_window_handle
-        title_main = self.driver.title
         windows = self.driver.window_handles
         n_windows = len(self.driver.window_handles)
 
         self.driver.execute_script('window.open();')
-        #while len(self.driver.window_handles) == n_windows:
-        #    time.sleep(0.5)
-        WebDriverWait(self.driver,60).until(ec.number_of_windows_to_be(n_windows +1)) 
+        while len(self.driver.window_handles) == n_windows:
+            time.sleep(0.5)
+         
         windows = self.driver.window_handles
         
         for guid in windows:
             if guid != main_window:
                 self.driver.switch_to_window(guid)
-                WebDriverWait(self.driver,60).until(ec.title_is(""))
                 break;
 
         new_window = self.driver.current_window_handle
-        #print(new_window)
         issue_data = []
         try:
             self.driver.get(issue_link)
-            elements = []
-            #wait = WebDriverWait(self.driver, 60)
+            wait = WebDriverWait(self.driver, 3600)
             #wait until the javascript with the images information is downloaded. And use the links
             #in the javascript itself, so there's no need to wait to download every image 
-            xpath ='/html/body/div[1]/script[1]'
-            css = '#containerRoot > script:nth-child(5)'
-            #css = 'body > table > tbody > tr:nth-child(662) > td.line-content > span'
-            #elements = wait.until(ec.presence_of_all_elements_located( (By.TAG_NAME,"script") ))
-            #for i, tag in enumerate(elements):
-            #    html_page = tag.get_attribute('innerHTML')
-            #    #print(html_page)
-            #    if "lstImages" in html_page:
-            #        break 
-            #element = wait.until(ec.presence_of_element_located( (By.CSS_SELECTOR, css) ))
-            WebDriverWait(self.driver,60).until(ec.title_contains("comic"))
-            html_page = self.driver.find_element_by_tag_name('body').get_attribute('innerHTML')
-            #print(html_page)
-            title_new = self.driver.title
+            elements = []
+            elements = wait.until(ec.presence_of_all_elements_located( (By.TAG_NAME,"script") ))
+            for i, tag in enumerate(elements):
+                html_page = tag.get_attribute('innerHTML')
+                if "lstImages" in html_page:
+                    break 
+
             generic_page_link = re.compile(
                 r'(?<=")https://2\.bp\.blogspot\.com/.+?(?=")', re.I)
             pages_links = re.findall(generic_page_link, html_page)
             issue_data = [comic_name, comic_issue, pages_links] 
 
             self.driver.switch_to_window(main_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_main))
             self.driver.close()
             self.driver.switch_to_window(new_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_new))
         
         except Exception as e:
             print(e)
             self.driver.switch_to_window(main_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_main))
             self.driver.close()
             self.driver.switch_to_window(new_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_new))
-            
+            return
             
 
         return issue_data
@@ -208,8 +181,3 @@ class RCO_Comic:
                     pbar.update(1)
 
 
-    def __del__(self):
-        try:
-            self.driver.quit()
-        except Exception as e:
-            print(e)

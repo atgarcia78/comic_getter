@@ -4,6 +4,7 @@ import operator
 import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+import threading
 import sys
 import time
 import img2pdf
@@ -45,7 +46,8 @@ def makepdf(issue_data):
         print("Couldn't write the pdf file...")
         print(FileWriteError)
 
-
+comic = ""
+comic2 = ""
 #Create terminal UI
 parser = argparse.ArgumentParser(
     prog="comic_getter",
@@ -85,67 +87,125 @@ if args.pdf:
 if args.config:
     ConfigJSON().edit_config()
 
-if args.input:
+try:
+    if args.input:
 
-    issues_links = []
-    #Download comic from link.
-    url = args.input
-    if "readcomiconline" in url:
-        comic = RCO_Comic(url)
-        _COMICTYPE="RCO"
-    elif "kissmanga" in url:
-        comic = Kissmanga_Comic(url)
-        _COMICTYPE="KISSMANGA"
-    else:
-        sys.exit("URL no soportada")  
+        issues_links = []
+        #Download comic from link.
+        url = args.input
+        if "readcomiconline" in url:
+            co = []
+            def init(url, co):
+                n = threading.currentThread().getName()
+                print("[{}]: will handle {}".format(n,url))
+                c = RCO_Comic(url)
+                co.append(c)
+                
+            t1 = threading.Thread(name='init-1', target=init, args=(url, co))
+            t2 = threading.Thread(name='init-2', target=init, args=(url, co))
+            t1.start()
+            t2.start()
+            t1.join()
+            comic = co[0]
+            
+            #RCO_Comic(url)
+            _COMICTYPE="RCO"
+        elif "kissmanga" in url:
+            comic = Kissmanga_Comic(url)
+            _COMICTYPE="KISSMANGA"
+        else:
+            sys.exit("URL no soportada")  
 
-    issues_links = list(comic.get_issues_links())
+        issues_links = list(comic.get_issues_links())
 
-    if not issues_links:
-        sys.exit("No se han encontrado ejemplares del cómic")
+        if not issues_links:
+            sys.exit("No se han encontrado ejemplares del cómic")
 
-    issues_links.reverse()
-    if args.verbose:
-        print(issues_links)
-    #Ignore determined links
-    skip = args.skip
-    if (skip != 0):
-        issues_links = issues_links[skip:]
+        issues_links.reverse()
         if args.verbose:
-            print("Tras skip")
-            print(issues_links)
-    first = args.first
-    last = args.last
+            n = threading.currentThread().getName()
+            print("[{}]: will handle {}".format(n,str(len(issues_links))))
+            print("[{}]: links\n{}".format(n,str(issues_links)))
+        #Ignore determined links
+        skip = args.skip
+        if (skip != 0):
+            issues_links = issues_links[skip:]
+            if args.verbose:
+                print("Tras skip")
+                print(issues_links)
+        first = args.first
+        last = args.last
 
-    if ((first != 0) and (last != 0)):
-        issues_links = issues_links[first-1:last]
-        if args.verbose:
-            print("Tras first last")
-            print(issues_links)
-    
-    if args.issue:
-        issues_links = issues_links[args.issue-1:args.issue]
-        if args.verbose:
-            print("Un issue")
-            print(issues_links)
-
-    issue_data = []
-    for i, issue in enumerate(issues_links):
-        id = comic.get_pages_links(i, issue)
-        issue_data.append(id)
-
-    if args.verbose:
-        print(issue_data)
-
-    comic.driver.quit()
-
-    if not args.nodownload:
+        if ((first != 0) and (last != 0)):
+            issues_links = issues_links[first-1:last]
+            if args.verbose:
+                print("Tras first last")
+                print(issues_links)
         
-        with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
-            results = executor.map(comic.download_issue, issue_data)
- 
-        with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
-            results = executor.map(makepdf, issue_data)
+        if args.issue:
+            issues_links = issues_links[args.issue-1:args.issue]
+            if args.verbose:
+                print("Un issue")
+                print(issues_links)
 
+    #  issue_data = []
+        
+    #  for i, issue in enumerate(issues_links):
+    #     id = comic.get_pages_links(issue)
+        #    issue_data.append(id)
+
+        def worker(co, issues_links, issue_d):
+            n = threading.currentThread().getName()
+            print("[{}]: will handle {}".format(n,str(len(issues_links))))
+            for i, issue in enumerate(issues_links):
+                id = co.get_pages_links(issue)
+                print("[{}]: {} out of {}".format(n,str(i+1),str(len(issues_links))))
+                issue_d.append(id)
+            
+            
+
+        issues1 = issues_links[0:len(issues_links)//2]
+        issues2 = issues_links[(len(issues_links)//2):(len(issues_links))]
+        print("1: " + str(issues1))
+        print("2: " + str(issues2))
+        t2.join()
+        comic2 = co[1]
+        #comic2 = RCO_Comic(url)
+        issue_data1 = []
+        issue_data2 = []
+        
+        
+        
+        t1 = threading.Thread(name="comic-1", target=worker, args=(comic, issues1, issue_data1)) 
+        t2 = threading.Thread(name="comic-2", target=worker, args=(comic2, issues2, issue_data2))
+        t1.start()
+        t2.start()
+
+        t1.join()
+        t2.join()
+
+        issue_data = issue_data1 + issue_data2
+
+        if args.verbose:
+            print(issue_data)
+
+
+
+        if not args.nodownload:
+            
+            with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
+                results = executor.map(comic.download_issue, issue_data)
     
-    
+            with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
+                results = executor.map(makepdf, issue_data)
+
+except Exception as e:
+    print(e)
+
+try:
+    if comic:
+        del comic
+    if comic2:
+        del comic2    
+except Exception as e:
+    print(e)
