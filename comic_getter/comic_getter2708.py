@@ -69,7 +69,6 @@ parser.add_argument('-n', '--nodownload', action='store_true',
                     help='not download')
 parser.add_argument('-v', '--verbose', action='store_true')
 parser.add_argument('-p', '--pdf', nargs=2, type=str)
-parser.add_argument('-t', '--threads', type=int, default="1")
 
 args = parser.parse_args()
 
@@ -95,31 +94,19 @@ try:
         #Download comic from link.
         url = args.input
         if "readcomiconline" in url:
-            
             co = []
-            hilos = []
             def init(url, co):
+                n = threading.currentThread().getName()
+                print("[{}]: will handle {}".format(n,url))
                 c = RCO_Comic(url)
-                if c:
-                    co.append(c)
-
-            for t in range(args.threads):
-                h = threading.Thread(name='init-' + str(t), target=init, args=(url, co))
-                h.start()
-                hilos.append(h)
-            
-            #esperamos al primer hilo que pase el cloudfare
-            i = 0
-            while True:
-
-                if len(co) > 0:
-                    comic = co[0]
-                    break
-                else:
-                    time.sleep(5)
-                    i += 1
-                    print("Waiting for first init... {} secs".format(i*5))
-
+                co.append(c)
+                
+            t1 = threading.Thread(name='init-1', target=init, args=(url, co))
+            t2 = threading.Thread(name='init-2', target=init, args=(url, co))
+            t1.start()
+            t2.start()
+            t1.join()
+            comic = co[0]
             
             #RCO_Comic(url)
             _COMICTYPE="RCO"
@@ -135,9 +122,10 @@ try:
             sys.exit("No se han encontrado ejemplares del cómic")
 
         issues_links.reverse()
-
-        
-
+        if args.verbose:
+            n = threading.currentThread().getName()
+            print("[{}]: will handle {}".format(n,str(len(issues_links))))
+            print("[{}]: links\n{}".format(n,str(issues_links)))
         #Ignore determined links
         skip = args.skip
         if (skip != 0):
@@ -160,125 +148,56 @@ try:
                 print("Un issue")
                 print(issues_links)
 
+    #  issue_data = []
+        
+    #  for i, issue in enumerate(issues_links):
+    #     id = comic.get_pages_links(issue)
+        #    issue_data.append(id)
 
-        if args.verbose:
-            print("Number of comics: [{}]".format(len(issues_links)) )
-            print(issues_links)
-
-        def worker(co, issue_l, issue_d):
+        def worker(co, issues_links, issue_d):
             n = threading.currentThread().getName()
-            print("[{}]: will handle {}".format(n,str(len(issue_l))))
-            print(issue_l)
-            y=0
-            for y, issue in enumerate(issue_l):
-                print("[{}]: {} out of {}".format(n,str(y+1),str(len(issue_l))))
+            print("[{}]: will handle {}".format(n,str(len(issues_links))))
+            for i, issue in enumerate(issues_links):
                 id = co.get_pages_links(issue)
+                print("[{}]: {} out of {}".format(n,str(i+1),str(len(issues_links))))
                 issue_d.append(id)
             
+            
+
+        issues1 = issues_links[0:len(issues_links)//2]
+        issues2 = issues_links[(len(issues_links)//2):(len(issues_links))]
+        print("1: " + str(issues1))
+        print("2: " + str(issues2))
+        t2.join()
+        comic2 = co[1]
+        #comic2 = RCO_Comic(url)
+        issue_data1 = []
+        issue_data2 = []
         
-
-        #esperamos a todos los hilos init
-
-        n_issues = len(issues_links) 
-        n_workers = args.threads
-
-        if n_workers > n_issues:
-            n_workers = n_issues
-
-        if args.verbose:
-            print("Number of workers: [{}]".format(n_workers))
-
-
-
-        issues_sub = []
-        issues_data = []
-        hilos2 = []
         
-        for i in range(0,n_workers):
- 
-            index_co = i
-            coef = n_issues%n_workers
-            if coef == 0:
-                coef = n_issues//n_workers
-            index_inf = i*coef
-            if (i < n_workers-1):
-                index_sup = index_inf + coef
-            else:
-                index_sup = n_issues
-            #if (index_sup > n_issues):
-            #    index_sup = n_issues
-            issues_sub.append(issues_links[index_inf:index_sup])
-            issues_data.append([])
-            k = 0
-            j = len(co)
-            if i >= j:
-                while True:
+        
+        t1 = threading.Thread(name="comic-1", target=worker, args=(comic, issues1, issue_data1)) 
+        t2 = threading.Thread(name="comic-2", target=worker, args=(comic2, issues2, issue_data2))
+        t1.start()
+        t2.start()
 
-                    if len(co) > j:                        
-                        break
-                    else:
-                        time.sleep(1)
-                        k += 1
-                        print("Waiting for new worker init... {} secs".format(k))
-                        if k > 15:
-                            break
+        t1.join()
+        t2.join()
 
-            if i >=  len(co):
-                sem = 0
-                k = 0
-                while True:
-                    for hi in hilos2:
-                        if not hi.isAlive():
-                            index_co = int(hi.getName().split("-")[1])
-                            print("Worker reused: {}".format(str(index_co)))
-                            sem = 1
-                            break
-
-                    if sem == 1:
-                        break
-                    else:
-                        time.sleep(1)
-                        k += 1
-                        print("Waiting for  worker available to reuse... {} secs".format(k))
-                        if k > 15:
-                            break
-
-
-
-            h = threading.Thread(name="comic-" + str(i), target=worker, args=(co[index_co], issues_sub[i], issues_data[i]))
-            h.start()
-            hilos2.append(h)
-
-        for hilo in hilos2:
-            hilo.join()
-
-
-        list_issues_data = []
-        for data in issues_data:
-            for d in data:
-                list_issues_data.append(d)
+        issue_data = issue_data1 + issue_data2
 
         if args.verbose:
-            print(list_issues_data)
+            print(issue_data)
 
-        list_pages=[]
-        for issue in list_issues_data:
-            co_name = issue[0]
-            co_issue = issue[1]
-            for p, page in enumerate(issue[2]):
-                list_pages.append([co_name, co_issue, p+1, page])
-        if args.verbose:
-            print(list_pages)
+
 
         if not args.nodownload:
             
-           # with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
-           #     results = executor.map(comic.download_issue, list_issues_data)
-            with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=50) as executor:
-                results = executor.map(comic.download_page, list_pages)
+            with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
+                results = executor.map(comic.download_issue, issue_data)
     
             with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=20) as executor:
-                results = executor.map(makepdf, list_issues_data)
+                results = executor.map(makepdf, issue_data)
 
 except Exception as e:
     print(e)

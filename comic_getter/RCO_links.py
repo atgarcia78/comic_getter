@@ -4,6 +4,7 @@ import operator
 import time
 import os
 import requests
+import threading
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -43,10 +44,11 @@ class RCO_Comic:
         #self.driver.set_window_size(1,1)
         self.driver.implicitly_wait(15) # seconds
         self.main_window = None
-        print("title:" + self.driver.title)
+        #print("title:" + self.driver.title)
         i = 0
         while i < 5:
             try:
+                print("[{}] : trying ... {} out of 5".format(threading.current_thread().getName(), i+1))
                 self.driver.get(self.main_link)
                 wait = WebDriverWait(self.driver, 30)
                 wait.until(ec.title_contains("comic"))
@@ -54,9 +56,11 @@ class RCO_Comic:
                 break
             except Exception as e:
                 i += 1
-        print(self.driver.title)
+        
         if not "comic" in self.driver.title:
-            raise Exception("Try again")
+            return None
+        print("[{}] : INIT OK".format(threading.current_thread().getName()))
+        
  
     def get_comic_and_issue_name(self, issue_link):
         '''Finds out comic and issue name from link.'''
@@ -206,6 +210,19 @@ class RCO_Comic:
                     with open(page_path, 'wb') as file:
                         file.write(page.content)
                     pbar.update(1)
+    
+    def download_page(self, page_data):
+        download_path = Path(f"{self.download_directory_path}/"
+                             f"{page_data[0]}/{page_data[1]}")
+
+        download_path.mkdir(parents=True, exist_ok=True)
+        page_path = Path(f"{download_path}/page{page_data[2]}.jpg")
+        if page_path.exists():
+            return
+        else:
+            page = requests.get(page_data[3], stream=True)
+            with open(page_path, 'wb') as file:
+                file.write(page.content)
 
 
     def __del__(self):
