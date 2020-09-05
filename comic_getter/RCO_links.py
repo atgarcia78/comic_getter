@@ -22,7 +22,7 @@ class RCO_Comic:
     '''Collection of functions that allow to download a 
     readcomiconline.to comic with all it's issues.'''
 
-    def __init__(self, main_link):
+    def __init__(self, main_link, headless):
         '''Initializes main_link attribute. '''
 
         # Seed link that contains all the links of the different issues.
@@ -36,8 +36,10 @@ class RCO_Comic:
         self.download_directory_path = data["download_dir"]
         options = Options()
         #options.page_load_strategy = 'eager'
-        options.headless = True
-        options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36'")
+        if headless:
+            options.headless = True
+        #options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36'")
+        options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:80.0) Gecko/20100101 Firefox/80.0'")
         #options.add_extension("/Users/antoniotorres/Downloads/extension_1_1_0_0.crx")
         #options.add_extension("/Users/antoniotorres/Downloads/extension_1_27_10_0.crx")
         self.driver = webdriver.Chrome(executable_path=self.driver_path,options=options)
