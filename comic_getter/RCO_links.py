@@ -14,6 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 from pathlib import Path
 from tqdm import tqdm
+from comic_getter import print_thr
 
 
 
@@ -225,6 +226,7 @@ class RCO_Comic:
             page = requests.get(page_data[3], stream=True)
             with open(page_path, 'wb') as file:
                 file.write(page.content)
+                print_thr(str(page_path))
 
 
     def __del__(self):

@@ -17,6 +17,7 @@ import img2pdf
 import glob
 import re
 import shutil
+import logging
 from queue import Queue, Empty
 from rclone import RClone
 
@@ -134,9 +135,8 @@ def makepdfandpostexec(issue_data):
 
 def print_thr(msg):
     n = threading.currentThread().getName()
-    print(f"[{n}]: {msg}") 
-
-
+    #print(f"[{n}]: {msg}") 
+    logging.info(f"[{n}]: {msg}")
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -165,11 +165,36 @@ def init_argparse() -> argparse.ArgumentParser:
     
     return parser
     
+def init_logging():
 
+    logging.basicConfig(
+        format = '%(asctime)-5s %(name)-15s %(levelname)-8s %(message)s',
+        level  = logging.DEBUG,      # Nivel de los eventos que se registran en el logger
+        filename = "/Users/antoniotorres/testing/mylogs.log", # Fichero en el que se escriben los logs
+        filemode = "a"              # a ("append"), en cada escritura, si el archivo de logs ya existe,
+                                # se abre y añaden nuevas lineas.
+    )
+    if logging.getLogger('').hasHandlers():
+        logging.getLogger('').handlers.clear()
 
+    # Handler nivel debug con salida a fichero
+    file_debug_handler = logging.FileHandler('/Users/antoniotorres/testing/mylogs.log')
+    file_debug_handler.setLevel(logging.DEBUG)
+    file_debug_format = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-%(message)s')
+    file_debug_handler.setFormatter(file_debug_format)
+    logging.getLogger('').addHandler(file_debug_handler)
+
+    # Handler nivel info con salida a consola
+    consola_handler = logging.StreamHandler()
+    consola_handler.setLevel(logging.INFO)
+    consola_handler_format = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-%(message)s')
+    consola_handler.setFormatter(consola_handler_format)
+    logging.getLogger('').addHandler(consola_handler)
+
+    
 parser = init_argparse()
+init_logging()
 args = parser.parse_args()
-
 
 comic = ""
 
@@ -321,6 +346,8 @@ else:
 
         issues_data = []
         futures2 = []
+
+        #theardpoolexecutor como context manager espera a todos los futuros antes de continuar
         with ThreadPoolExecutor(thread_name_prefix="comic", max_workers=n_workers) as executor:
             for i in range(n_workers):
                 futures2.append(executor.submit(worker, rcocomic_queue, issues_queue, issues_data)) 
@@ -329,8 +356,8 @@ else:
         for data in issues_data:
             list_issues_data.append(data)
 
-        if args.verbose:
-            print_thr(list_issues_data)
+        #if args.verbose:
+            #print_thr(list_issues_data)
 
         list_pages=[]
         for issue in list_issues_data:
@@ -340,10 +367,12 @@ else:
                 list_pages.append([co_name, co_issue, p+1, page])
        
 
-        print_thr(f" Total páginas  {str(len(list_pages))}")
+        
+        
         if args.verbose:
             
-            print_thr(list_pages)
+            print_thr(f" Total páginas  {str(len(list_pages))}")
+            #print_thr(list_pages)
 
         if not args.nodownload:
             
@@ -351,7 +380,7 @@ else:
            #     results = executor.map(comic.download_issue, list_issues_data)
 
             try:
-                with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=50) as executor:
+                with ThreadPoolExecutor(thread_name_prefix='downloader', max_workers=10) as executor:
                     results = executor.map(comic.download_page, list_pages)
                       
             except Exception as e:
@@ -359,7 +388,7 @@ else:
 
             try:
 
-                with ThreadPoolExecutor(thread_name_prefix='pdfandexec', max_workers=20) as executor2:
+                with ThreadPoolExecutor(thread_name_prefix='pdfandexec', max_workers=10) as executor2:
                     results2 = executor2.map(makepdfandpostexec, list_issues_data)
                      
             except Exception as e:
