@@ -5,23 +5,26 @@ import time
 import os
 import requests
 import threading
+import logging
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as ec
-
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
 from pathlib import Path
 from tqdm import tqdm
-from comic_getter import print_thr
+from utils import (
+    print_thr,
+    print_thr_error
+)
 
 
 
 #Pending make skipable issues and consider allowing hq download.
 class RCO_Comic:
     '''Collection of functions that allow to download a 
-    readcomiconline.to comic with all it's issues.'''
+    readcomiconline.to comic with all its issues.'''
 
     def __init__(self, main_link, headless):
         '''Initializes main_link attribute. '''
@@ -51,7 +54,7 @@ class RCO_Comic:
         i = 0
         while i < 5:
             try:
-                print("[{}] : trying ... {} out of 5".format(threading.current_thread().getName(), i+1))
+                logging.info(f"[{}] : trying ... {} out of 5".format(threading.current_thread().getName(), i+1))
                 self.driver.get(self.main_link)
                 wait = WebDriverWait(self.driver, 30)
                 wait.until(ec.title_contains("comic"))
@@ -62,7 +65,8 @@ class RCO_Comic:
         
         if not "comic" in self.driver.title:
             return None
-        print("[{}] : INIT OK".format(threading.current_thread().getName()))
+        
+        logging.info(f"[{}] : INIT OK".format(threading.current_thread().getName()))
         
  
     def get_comic_and_issue_name(self, issue_link):
@@ -115,7 +119,7 @@ class RCO_Comic:
 
             
         except Exception as e:
-            print(e)
+            logging.error(e)
             return
         
     
@@ -181,7 +185,7 @@ class RCO_Comic:
             WebDriverWait(self.driver,60).until(ec.title_is(title_new))
         
         except Exception as e:
-            print(e)
+            logging.error(e)
             self.driver.switch_to_window(main_window)
             WebDriverWait(self.driver,60).until(ec.title_is(title_main))
             self.driver.close()
@@ -233,4 +237,4 @@ class RCO_Comic:
         try:
             self.driver.quit()
         except Exception as e:
-            print(e)
+            logging.error(e)

@@ -2,14 +2,6 @@ import argparse
 import json
 import operator
 import os
-from pathlib import Path
-from concurrent.futures import(
-    ThreadPoolExecutor,
-    wait,
-    FIRST_COMPLETED,
-    ALL_COMPLETED,
-    )
-
 import threading
 import sys
 import time
@@ -20,10 +12,20 @@ import shutil
 import logging
 from queue import Queue, Empty
 from rclone import RClone
-
 from config_generator import ConfigJSON
 from RCO_links import RCO_Comic
 from Kissmanga_links import Kissmanga_Comic
+from utils import (
+    print_thr,
+    print_thr_error
+)
+from pathlib import Path
+from concurrent.futures import(
+    ThreadPoolExecutor,
+    wait,
+    FIRST_COMPLETED,
+    ALL_COMPLETED,
+)
 
 download_path_str = "/Users/antoniotorres/Documents/comics/"
 usbext_path_str = "/Volumes/Pandaext1/comics/"
@@ -85,8 +87,8 @@ def makepdfandpostexec(issue_data):
                 f.write(img2pdf.convert(im_files))
                 print_thr("Conversion to pdf completed")
     except Exception as FileWriteError:
-        print_thr("Couldn't write the pdf file...")
-        print_thr(FileWriteError)
+        print_thr_error("Couldn't write the pdf file...")
+        print_thr_error(FileWriteError)
 
     
     if pdf_file_name.exists():
@@ -120,23 +122,20 @@ def makepdfandpostexec(issue_data):
                 try:
                     shutil.rmtree(str(download_path))
                 except Exception as OSError:
-                    pass
+                    print_thr_error(OSError)
                 print_thr("Removal of issue download folder .. OK")
             except Exception as OSError:
-                print_thr(e)
+                print_thr_error(OSError)
     else:
-        print_thr("ERROR pdf file")
+        print_thr_error("ERROR pdf file")
 
     try:
         pdf_path.rmdir() #will remove folder ony if it is empty
     except Exception as OSError:
-        pass
+        print_thr_error(OSError)
 
 
-def print_thr(msg):
-    n = threading.currentThread().getName()
-    #print(f"[{n}]: {msg}") 
-    logging.info(f"[{n}]: {msg}")
+
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -169,7 +168,7 @@ def init_logging():
 
     logging.basicConfig(
         format = '%(asctime)-5s %(name)-15s %(levelname)-8s %(message)s',
-        level  = logging.DEBUG,      # Nivel de los eventos que se registran en el logger
+        level  = logging.INFO,      # Nivel de los eventos que se registran en el logger
         filename = "/Users/antoniotorres/testing/mylogs.log", # Fichero en el que se escriben los logs
         filemode = "a"              # a ("append"), en cada escritura, si el archivo de logs ya existe,
                                 # se abre y añaden nuevas lineas.
@@ -179,7 +178,7 @@ def init_logging():
 
     # Handler nivel debug con salida a fichero
     file_debug_handler = logging.FileHandler('/Users/antoniotorres/testing/mylogs.log')
-    file_debug_handler.setLevel(logging.DEBUG)
+    file_debug_handler.setLevel(logging.INFO)
     file_debug_format = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-%(message)s')
     file_debug_handler.setFormatter(file_debug_format)
     logging.getLogger('').addHandler(file_debug_handler)
@@ -196,7 +195,6 @@ parser = init_argparse()
 init_logging()
 args = parser.parse_args()
 
-comic = ""
 
 #Check if config.json exists
 if not ConfigJSON().config_exists():
@@ -214,7 +212,7 @@ if args.config:
     ConfigJSON().edit_config()
 
 if not args.input:
-    sys.exit("Falta URL")
+    sys.exit("URL missing")
 
 else:
 
@@ -277,7 +275,7 @@ else:
             if (skip != 0):
                 issues_links = issues_links[skip:]
                 if args.verbose:
-                    print_thr("Tras skip")
+                    print_thr("After skip")
                     print_thr(issues_links)
 
             #subset of consecutive issues
@@ -286,7 +284,7 @@ else:
             if ((first != 0) and (last != 0)):
                 issues_links = issues_links[first-1:last]
                 if args.verbose:
-                    print_thr("Tras first last")
+                    print_thr("After first-last")
                     print_thr(issues_links)
         
             #single issue
@@ -306,7 +304,7 @@ else:
 
         if args.verbose:
             print_thr("Number of comics: [{}]".format(n_issues))
-            print_thr("Number of workers: {}".format(n_workers))
+            print_thr("Number of workers: [{}]".format(n_workers))
             print_thr(issues_links)
 
    
@@ -321,7 +319,7 @@ else:
                     id = co.get_pages_links(issue)
                     issue_d.append(id)
                 except Exception as e:
-                    print_thr(e)
+                    print_thr_error(e)
                     break
         
             
@@ -366,12 +364,11 @@ else:
             for p, page in enumerate(issue[2]):
                 list_pages.append([co_name, co_issue, p+1, page])
        
-
-        
+ 
         
         if args.verbose:
             
-            print_thr(f" Total páginas  {str(len(list_pages))}")
+            print_thr(f" Total pages:  [{str(len(list_pages))}]")
             #print_thr(list_pages)
 
         if not args.nodownload:
@@ -384,7 +381,7 @@ else:
                     results = executor.map(comic.download_page, list_pages)
                       
             except Exception as e:
-                print_thr("Fallo en DL " + str(e))
+                print_thr_error("DL error " + str(e))
 
             try:
 
@@ -392,8 +389,8 @@ else:
                     results2 = executor2.map(makepdfandpostexec, list_issues_data)
                      
             except Exception as e:
-                print_thr("Fallo en pdf y post " + str(e))
+                print_thr_error("Fail in pdf and postprocessing " + str(e))
 
     except Exception as e:
-        print_thr(e)
+        print_thr_error(e)
 
