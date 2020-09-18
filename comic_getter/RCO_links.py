@@ -54,19 +54,21 @@ class RCO_Comic:
         i = 0
         while i < 5:
             try:
-                logging.info(f"[{}] : trying ... {} out of 5".format(threading.current_thread().getName(), i+1))
+                logging.info(f"[{threading.current_thread().getName()}] : trying ... {i+1} out of 5")
                 self.driver.get(self.main_link)
                 wait = WebDriverWait(self.driver, 30)
                 wait.until(ec.title_contains("comic"))
                 assert "comic" in self.driver.title
                 break
             except Exception as e:
-                i += 1
+                print_thr_error(e)
+                
+            i += 1
         
         if not "comic" in self.driver.title:
             return None
         
-        logging.info(f"[{}] : INIT OK".format(threading.current_thread().getName()))
+        logging.info(f"[{threading.current_thread().getName()}] : INIT OK")
         
  
     def get_comic_and_issue_name(self, issue_link):
