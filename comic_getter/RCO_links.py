@@ -62,7 +62,7 @@ class RCO_Comic:
                 break
             except Exception as e:
                 print_thr_error(e)
-                
+            
             i += 1
         
         if not "comic" in self.driver.title:
@@ -88,27 +88,12 @@ class RCO_Comic:
     def get_issues_links(self):
         '''Gather all individual issues links from main link.'''
 
-        #self.driver.get(self.main_link)
-        # A 60 second margin is given for rowser to bypass cloudflare.
+
         try:
-            #wait = WebDriverWait(self.driver, 120)
-            # element = wait.until(ec.presence_of_element_located(
-            #    (By.CLASS_NAME, "listing")))
-            # # The whole html code is downloaded.
-            #strf = ".listing > tbody:nth-child(1)"
-            #element = wait.until(ec.title_contains("comic"))
-            #assert "comic" in self.driver.title
-            #print(self.driver.title)
+
 
             body = self.driver.find_element_by_class_name("listing").get_attribute('innerHTML')
-            #body = str(body.get_attribute('innerHTML'))
-            #body = str(element.get_attribute('innerHTML'))
-            #print(body)
-            # table = self.driver.find_element_by_class_name("listing")
-            # self.main_window = self.driver.current_window_handle
-            # body = table.get_attribute('innerHTML')
-            # self.driver.quit()
-            # Re module is used to extract relevant links.
+
             core_link = "https://readcomiconline.to"
             generic_link = re.compile(r'(?<=")/Comic/.+?id=\d+(?=")', re.I)
             target_links = re.findall(generic_link, body)
@@ -150,19 +135,19 @@ class RCO_Comic:
             if guid != main_window:
                 self.driver.switch_to_window(guid)
                 WebDriverWait(self.driver,60).until(ec.title_is(""))
-                break;
+                break
 
         new_window = self.driver.current_window_handle
         #print(new_window)
         issue_data = []
         try:
             self.driver.get(issue_link)
-            elements = []
+            #elements = []
             #wait = WebDriverWait(self.driver, 60)
             #wait until the javascript with the images information is downloaded. And use the links
             #in the javascript itself, so there's no need to wait to download every image 
-            xpath ='/html/body/div[1]/script[1]'
-            css = '#containerRoot > script:nth-child(5)'
+            #xpath ='/html/body/div[1]/script[1]'
+            #css = '#containerRoot > script:nth-child(5)'
             #css = 'body > table > tbody > tr:nth-child(662) > td.line-content > span'
             #elements = wait.until(ec.presence_of_all_elements_located( (By.TAG_NAME,"script") ))
             #for i, tag in enumerate(elements):
