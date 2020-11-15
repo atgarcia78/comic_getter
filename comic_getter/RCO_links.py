@@ -6,69 +6,61 @@ import os
 import requests
 import threading
 import logging
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support import expected_conditions as ec
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support.ui import Select
+from requests_html import HTMLSession
 from pathlib import Path
-from tqdm import tqdm
 from utils import (
     print_thr,
     print_thr_error
 )
+from user_agent import generate_user_agent
+from random import choice
 
 
-
-#Pending make skipable issues and consider allowing hq download.
-class RCO_Comic:
+class RCO_Comic():
     '''Collection of functions that allow to download a 
     readcomiconline.to comic with all its issues.'''
 
-    def __init__(self, main_link, headless):
-        '''Initializes main_link attribute. '''
+    def get_proxies(self):
 
-        # Seed link that contains all the links of the different issues.
-        self.main_link = main_link
+        list_ports = [1080,1085,1090]
+        list_hosts = ['proxy.secureconnect.me', 'proxy.torguard.org']
 
+        h = choice(list_hosts)
+        p = choice(list_ports)
+
+        proxies = dict()
+        proxies = {
+            'http':  f'socks5h://atgarcia:ID4KrSc6mo6aiy8@{h}:{p}',
+            'https': f'socks5h://atgarcia:ID4KrSc6mo6aiy8@{h}:{p}',
+        }
+
+
+        return (proxies)
+
+    def get_useragent(self):
+        headers = dict()
+        user_agent = generate_user_agent(os=('mac', 'linux'))
+        headers['User-Agent'] = user_agent
+
+        return(headers)
+    
+    def __init__(self):
+        
+        # headers = dict()
+        # user_agent = generate_user_agent(os=('mac', 'linux'))
+        # #headers['User-Agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:82.0) Gecko/20100101 Firefox/84.0"
+        # headers['User-Agent'] = user_agent
+        
+        self.session = HTMLSession()
+        #self.session.headers.update(self.get_useragent())
         # Extract data from config.json
         dir_path = Path(f"{os.path.dirname(os.path.abspath(__file__))}/config.json")
         with open(dir_path) as config:
             data = json.load(config)
-        self.driver_path = data["chromedriver_path"]
+       
         self.download_directory_path = data["download_dir"]
-        options = Options()
-        #options.page_load_strategy = 'eager'
-        if headless:
-            options.headless = True
-        #options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36'")
-        options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:80.0) Gecko/20100101 Firefox/80.0'")
-        #options.add_extension("/Users/antoniotorres/Downloads/extension_1_1_0_0.crx")
-        #options.add_extension("/Users/antoniotorres/Downloads/extension_1_27_10_0.crx")
-        self.driver = webdriver.Chrome(executable_path=self.driver_path,options=options)
-        #self.driver.set_window_size(1,1)
-        self.driver.implicitly_wait(15) # seconds
-        self.main_window = None
-        #print("title:" + self.driver.title)
-        i = 0
-        while i < 5:
-            try:
-                logging.info(f"[{threading.current_thread().getName()}] : trying ... {i+1} out of 5")
-                self.driver.get(self.main_link)
-                wait = WebDriverWait(self.driver, 30)
-                wait.until(ec.title_contains("comic"))
-                assert "comic" in self.driver.title
-                break
-            except Exception as e:
-                print_thr_error(e)
-            
-            i += 1
-        
-        if not "comic" in self.driver.title:
-            return None
-        
-        logging.info(f"[{threading.current_thread().getName()}] : INIT OK")
+       
+        #logging.info(f"[{threading.current_thread().getName()}] : INIT OK")
         
  
     def get_comic_and_issue_name(self, issue_link):
@@ -85,31 +77,29 @@ class RCO_Comic:
         return comic_issue_name
 
 
-    def get_issues_links(self):
+    def get_issues_links(self, url):
         '''Gather all individual issues links from main link.'''
-
 
         try:
 
-
-            body = self.driver.find_element_by_class_name("listing").get_attribute('innerHTML')
-
+            #body = self.driver.find_element_by_class_name("listing").get_attribute('innerHTML')
+            self.session.headers.update(self.get_useragent())
+            r = self.session.get(url, proxies=self.get_proxies(), timeout=60)
             core_link = "https://readcomiconline.to"
             generic_link = re.compile(r'(?<=")/Comic/.+?id=\d+(?=")', re.I)
-            target_links = re.findall(generic_link, body)
+            target_links = re.findall(generic_link, r.html.html)
             issues_links = []
             for link in target_links:
                 #full_link = core_link + link
-                full_link = core_link + link + "&quality=hq&readType=1"
+                full_link = core_link + link + "&quality=hq"
                 issues_links.append(full_link)
             return (issues_links)
 
             
         except Exception as e:
             logging.error(e)
-            return
         
-    
+        
     
     def get_pages_links(self, issue_link):
         ''' Gather the links of each page of an issue.'''
@@ -119,109 +109,62 @@ class RCO_Comic:
         comic_name = info[0]
         comic_issue = info[1]
         
+        pages_links = []
 
-        main_window = self.driver.current_window_handle
-        title_main = self.driver.title
-        windows = self.driver.window_handles
-        n_windows = len(self.driver.window_handles)
-
-        self.driver.execute_script('window.open();')
-        #while len(self.driver.window_handles) == n_windows:
-        #    time.sleep(0.5)
-        WebDriverWait(self.driver,60).until(ec.number_of_windows_to_be(n_windows +1)) 
-        windows = self.driver.window_handles
-        
-        for guid in windows:
-            if guid != main_window:
-                self.driver.switch_to_window(guid)
-                WebDriverWait(self.driver,60).until(ec.title_is(""))
-                break
-
-        new_window = self.driver.current_window_handle
-        #print(new_window)
         issue_data = []
+  
         try:
-            self.driver.get(issue_link)
-            #elements = []
-            #wait = WebDriverWait(self.driver, 60)
-            #wait until the javascript with the images information is downloaded. And use the links
-            #in the javascript itself, so there's no need to wait to download every image 
-            #xpath ='/html/body/div[1]/script[1]'
-            #css = '#containerRoot > script:nth-child(5)'
-            #css = 'body > table > tbody > tr:nth-child(662) > td.line-content > span'
-            #elements = wait.until(ec.presence_of_all_elements_located( (By.TAG_NAME,"script") ))
-            #for i, tag in enumerate(elements):
-            #    html_page = tag.get_attribute('innerHTML')
-            #    #print(html_page)
-            #    if "lstImages" in html_page:
-            #        break 
-            #element = wait.until(ec.presence_of_element_located( (By.CSS_SELECTOR, css) ))
-            WebDriverWait(self.driver,60).until(ec.title_contains("comic"))
-            html_page = self.driver.find_element_by_tag_name('body').get_attribute('innerHTML')
-            #print(html_page)
-            title_new = self.driver.title
+            self.session.headers.update(self.get_useragent())
+            r = self.session.get(issue_link, proxies=self.get_proxies(), timeout=60)
+            #logging.debug(r.html.html)
             generic_page_link = re.compile(
                 r'(?<=")https://2\.bp\.blogspot\.com/.+?(?=")', re.I)
-            pages_links = re.findall(generic_page_link, html_page)
-            issue_data = [comic_name, comic_issue, pages_links] 
+            pages_links = re.findall(generic_page_link, r.html.html)
 
-            self.driver.switch_to_window(main_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_main))
-            self.driver.close()
-            self.driver.switch_to_window(new_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_new))
+            if pages_links:
+                logging.debug(pages_links)
+                issue_data = {'comic': comic_name, 'issue': comic_issue, 'pages': pages_links, 'error': 0}
+            else:
+                logging.error(issue_link + " : No hay links de páginas")
+                logging.debug(r.html.html)
+                issue_data = {'comic': comic_name, 'issue': comic_issue, 'pages': "" , 'error': -1}
         
         except Exception as e:
             logging.error(e)
-            self.driver.switch_to_window(main_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_main))
-            self.driver.close()
-            self.driver.switch_to_window(new_window)
-            WebDriverWait(self.driver,60).until(ec.title_is(title_new))
-            
-            
-
+            issue_data = {'comic': comic_name, 'issue': comic_issue, 'pages': "" , 'error': -1}
+        
         return issue_data
         
-    def download_issue(self, issue_data):
-        ''' Download image from link.'''
+      
+    def download_page(self, in_queue, out_queue):
+        
+        while not in_queue.empty():
 
-        download_path = Path(f"{self.download_directory_path}/"
-                             f"{issue_data[0]}/{issue_data[1]}")
+            try:
+                page_data = in_queue.get()
 
-        download_path.mkdir(parents=True, exist_ok=True)
-        #print(f"Started downloading {issue_data[2]}")
+                download_path = Path(f"{self.download_directory_path}/"
+                                    f"{page_data['comic']}/{page_data['issue']}")
 
-        # Create progress bar that monitors page download.
-        with tqdm(total=len(issue_data[2])) as pbar:
-            for index, link in enumerate(issue_data[2]):
-
-                page_path = Path(f"{download_path}/page{index}.jpg")
+                download_path.mkdir(parents=True, exist_ok=True)
+                page_path = Path(f"{download_path}/page{page_data['num']}.jpg")
+                
                 if page_path.exists():
+                    in_queue.task_done()
+                    out_queue.put({'comic': page_data['comic'], 'issue': page_data['issue'], 'num': page_data['num'], 'error': 1})
                     continue
                 else:
-                    page = requests.get(link, stream=True)
-                    with open(page_path, 'wb') as file:
-                        file.write(page.content)
-                    pbar.update(1)
-    
-    def download_page(self, page_data):
-        download_path = Path(f"{self.download_directory_path}/"
-                             f"{page_data[0]}/{page_data[1]}")
-
-        download_path.mkdir(parents=True, exist_ok=True)
-        page_path = Path(f"{download_path}/page{page_data[2]}.jpg")
-        if page_path.exists():
-            return
-        else:
-            page = requests.get(page_data[3], stream=True)
-            with open(page_path, 'wb') as file:
-                file.write(page.content)
-                print_thr(str(page_path))
-
-
-    def __del__(self):
-        try:
-            self.driver.quit()
-        except Exception as e:
-            logging.error(e)
+                    try:
+                        with self.session.get(page_data['page'], proxies=self.get_proxies(), headers=self.get_useragent(), stream=True) as page:
+                            with open(page_path, 'wb') as file:
+                                file.write(page.content)
+                                #print_thr(str(page_path))
+                            out_queue.put({'comic': page_data['comic'], 'issue': page_data['issue'], 'num': page_data['num'], 'error': 0})
+                    except Exception as e:
+                        print_thr_error(e)
+                        in_queue.task_done()
+                        out_queue.put({'comic': page_data['comic'], 'issue': page_data['issue'], 'num': page_data['num'], 'error': -1})
+            except Exception as e:
+                print_thr_error(e)
+            
+        
