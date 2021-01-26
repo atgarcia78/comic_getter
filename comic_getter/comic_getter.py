@@ -2,7 +2,6 @@ import argparse
 import os
 import sys
 import img2pdf
-import glob
 import re
 import shutil
 import logging
@@ -163,10 +162,10 @@ def worker(in_queue, out_queue, proxy):
 
     comic = RCO_Comic(proxy)  
     while not in_queue.empty():
+        
+        issue = in_queue.get()
+        print_thr(logger,issue)
         try:
-            issue = in_queue.get()
-            print_thr(logger,issue)
-
             id = comic.get_pages_links(issue)
             out_queue.put({"comic": id['comic'], "issue" : id['issue'], "pages_links": id['pages'], "error": 0})
         except Exception as e:
@@ -198,7 +197,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('--pdf', type=str)
     parser.add_argument('-t', '--threads', type=int, default="1")
     parser.add_argument('--check', type=str, help="check name,issue")
-    parser.add_argument('--proxy', action='store_true')
+    parser.add_argument('--proxy', type=str)
     parser.add_argument('--search', action='store_true')
 
     #parser.add_argument('--full', action='store_true')
@@ -221,7 +220,7 @@ if not ConfigJSON().config_exists():
 
 if args.pdf:
     data = args.pdf.split(",")
-    print(data)
+    print_thr(data)
     q = Queue()
     q.put(data[0] + "/" + data[1])   
     makepdfandclean(q)
@@ -245,7 +244,9 @@ else:
     
         issues_links = []
                
-        comic = RCO_Comic(args.proxy)    
+        comic = RCO_Comic(args.proxy)   
+
+        comic.close_driver() 
 
         if not args.search:
             url = args.input

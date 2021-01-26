@@ -32,13 +32,13 @@ class RCO_Comic():
         # headers = dict()
         # user_agent = generate_user_agent(os=('mac', 'linux'))
         # #headers['User-Agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:82.0) Gecko/20100101 Firefox/84.0"
-        # headers['User-Agent'] = user_agent
+        # headers['User-Agent'] = user_agent 
         
         self.logger = logging.getLogger("rco")
         timeout = httpx.Timeout(20, connect=60)
         if proxy:
             #self.ip_proxy = get_ip_proxy()
-            self.ip_proxy = "96.44.148.66"
+            self.ip_proxy = proxy
             print_thr(self.logger, self.ip_proxy)
             self.client = httpx.Client(
                 proxies=f"http://atgarcia:ID4KrSc6mo6aiy8@{self.ip_proxy}:6060",
@@ -56,7 +56,7 @@ class RCO_Comic():
         #self.client.headers.update(get_useragent())
         self.client.headers['user-agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:84.0) Gecko/20100101 Firefox/84.0' 
         self.client.headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
-        self.log_in()
+        #self.log_in()
         #self.client.headers.update(self.get_useragent())
         # Extract data from config.json
         dir_path = Path(f"{os.path.dirname(os.path.abspath(__file__))}/config.json")
@@ -70,9 +70,16 @@ class RCO_Comic():
 
         options = Options()
         options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:84.0) Gecko/20100101 Firefox/84.0'")
+        options.add_extension("/Users/antoniotorres/testing/1.0.6.46_0.crx")
         self.driver = webdriver.Chrome(executable_path=shutil.which('chromedriver'),options=options)
+        self.driver.minimize_window()
+
+        
 
         #print_thr(f"[{threading.current_thread().getName()}] : INIT OK")
+
+    def close_driver(self):
+        self.driver.close()
 
     def log_in(self):
         res = self.client.get(self._LOG_IN_URL)
@@ -152,6 +159,8 @@ class RCO_Comic():
         issue_data = []
 
         
+
+        
   
         try:
             
@@ -165,15 +174,18 @@ class RCO_Comic():
             if pages_links:
                 self.logger.info(pages_links)
                 issue_data = {'comic': comic_name, 'issue': comic_issue, 'pages': pages_links, 'error': 0}
-                sleep(5)
+                sleep(10)
             else:
                 if "human" in res.text:
                     print_thr(self.logger, f"{issue_link} are you human ERROR")
+                    self.driver.delete_all_cookies()
                     self.driver.get(issue_link)
                     input(f"RESOLVE: {issue_link}\n")
-                    b_token = self.driver.getcookie('b_token').get('value')
+                    #b_token = self.driver.get_cookie('b_token').get('value')
+                    cookies = self.driver.get_cookies()
+                    for cookie in cookies:
+                        self.client.cookies.set(cookie.get('name'), cookie.get('value'), cookie.get('domain'))
                     self.driver.delete_all_cookies()
-                    self.client.cookies.set('b_token', b_token, 'readcomiconline.to')                    
                     res = self.client.get(issue_link)
                     generic_page_link = r'push\(\"(https://2\.bp\.blogspot\.com/.*?)\"'
                     #logging.debug(r.html.html)
@@ -190,7 +202,8 @@ class RCO_Comic():
         except Exception as e:
             print_thr_error(self.logger,e)
             issue_data = {'comic': comic_name, 'issue': comic_issue, 'pages': "" , 'error': -1}
-        
+
+       
         return issue_data
         
       
