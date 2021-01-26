@@ -1,5 +1,6 @@
-
-comic_getter/__pycache__/comic_getter.cpython-38.pyc
-comic_getter/__pycache__/config_generator.cpython-38.pyc
+comic_getter/__pycache__/
+comic_getter/__pycache__/
 *.pyc
 comic_getter/comic_getter0509.py
+venv/
+comic_getter/old/
