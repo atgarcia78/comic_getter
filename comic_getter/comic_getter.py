@@ -52,6 +52,14 @@ def check_comic_ok(queue):
     return(comics)
 
 
+def check_all(name):
+
+    co_path = Path(f"{download_path_str}{name}")
+    list_files = [file for file in co_path.iterdir()]
+    for file in list_files:
+        name_p = file.stem.split("_")
+        sanitise(name_p[0],name_p[1])
+
 def sanitise(name, issue):
     
     co_path = Path(f"{download_path_str}{name}/{name}_{issue}.pdf")
@@ -59,7 +67,11 @@ def sanitise(name, issue):
     if not co_path.exists():
         return
     elif not co_path.is_symlink():
+        cfg = "/Users/antoniotorres/.config/rclone"          
+
+        #rc = RClone(cfg)
         rc = RClone()
+        #rc = rclone.with_config(cfg)
         res = rc.ls(f"{gdrive_path_str}{name}/{name}_{issue}.pdf")
         if res['code'] != 0:
             res = rc.copy(str(co_path), f"gdrive:comics/{name}")
@@ -115,7 +127,7 @@ def makepdfandclean(in_queue):
                 print_thr(logger,"Removal of issue download folder .. OK") 
             except Exception as OSError:
                 print_thr_error(logger,"Fallo al intentar borrar dir con inmágenes del comic  " + str(OSError))
-                      
+
 
             rc = RClone()  
     
@@ -199,6 +211,7 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('--check', type=str, help="check name,issue")
     parser.add_argument('--proxy', type=str)
     parser.add_argument('--search', action='store_true')
+    parser.add_argument('--checkall', type=str)
 
     #parser.add_argument('--full', action='store_true')
 
@@ -220,7 +233,7 @@ if not ConfigJSON().config_exists():
 
 if args.pdf:
     data = args.pdf.split(",")
-    print_thr(data)
+    #print_thr(data)
     q = Queue()
     q.put(data[0] + "/" + data[1])   
     makepdfandclean(q)
@@ -229,6 +242,14 @@ if args.pdf:
 if args.check:
     data = args.check.split(",")
     sanitise(data[0], data[1])
+    sys.exit()
+
+if args.checkall:
+    list_data = args.checkall.split(",")
+    with ThreadPoolExecutor(thread_name_prefix="checkall", max_workers=5) as executor:
+            futures = [executor.submit(check_all(data_n)) for data_n in list_data] 
+
+            wait(futures, return_when=ALL_COMPLETED)
     sys.exit()
 
 if args.config:

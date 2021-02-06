@@ -45,7 +45,7 @@ def init_logging(file_path=None):
         config = json.loads(f.read())
     
     config['handlers']['info_file_handler']['filename'] = config['handlers']['info_file_handler']['filename'].format(home = str(Path.home()))
-    config['handlers']['error_file_handler']['filename'] = config['handlers']['error_file_handler']['filename'].format(home = str(Path.home()))
+    # config['handlers']['error_file_handler']['filename'] = config['handlers']['error_file_handler']['filename'].format(home = str(Path.home()))
 
     logging.config.dictConfig(config)  
 

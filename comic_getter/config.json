@@ -1,1 +1,1 @@
-{"download_dir": "{home}/Documents/comics", "chromedriver_path": "/usr/local/bin/chromedriver", "config_logging" : "{home}/testing/logging.json"}
+{"download_dir": "{home}/Documents/comics", "config_logging" : "{home}/testing/logging.json"}

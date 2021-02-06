@@ -70,7 +70,8 @@ class RCO_Comic():
 
         options = Options()
         options.add_argument("user-agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:84.0) Gecko/20100101 Firefox/84.0'")
-        options.add_extension("/Users/antoniotorres/testing/1.0.6.46_0.crx")
+        self.extensionpath = Path(Path.home(), "Projects/comic_getter/comic_getter/1.0.6.46_0.crx")
+        options.add_extension(str(self.extensionpath))
         self.driver = webdriver.Chrome(executable_path=shutil.which('chromedriver'),options=options)
         self.driver.minimize_window()
 
