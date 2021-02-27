@@ -1,0 +1,4 @@
+1614171253486	geckodriver	INFO	Listening on 127.0.0.1:62229
+1614171254823	mozrunner::runner	INFO	Running command: "/Applications/Firefox.app/Contents/MacOS/firefox-bin" "--marionette" "-headless" "-foreground" "-no-remote" "-profile" "/var/folders/8t/kly4rbs90b7_w2xfjdld2yvm0000gn/T/rust_mozprofileIjogM5"
+*** You are running in headless mode.
+This profile was last used with a newer version of this application. Please create a new profile.
