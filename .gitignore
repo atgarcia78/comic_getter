@@ -4,3 +4,4 @@ comic_getter/__pycache__/
 comic_getter/comic_getter0509.py
 venv/
 comic_getter/old/
+*.log
