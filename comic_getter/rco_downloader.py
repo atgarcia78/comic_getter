@@ -76,8 +76,8 @@ class RCO_Downloader():
         
         #self.init_nt_resources()
         self.driver_list = [None for _ in range(self._NUM_DRIVERS)]
-        self.client = httpx.AsyncClient(timeout=httpx.Timeout(20, connect=60),
-                        limits=httpx.Limits(max_keepalive_connections=None, max_connections=None))
+        
+        #self.driver_list = [self.start_driver(i) for i in range(self._NUM_DRIVERS)]
                 
         self.info_dict = dict()
         self.info_dict['comics'] = []
@@ -85,31 +85,39 @@ class RCO_Downloader():
         self.ctx_dl = dict()
         self.ctx_dl['res_dl'] = []
         self.ctx_dl['asyncpages_queue'] = asyncio.Queue()
-        self.ctx_dl['issues_queue'] = Queue()
+        self.ctx_dl['issues_queue'] = asyncio.Queue()
+        
+        self.driversnok = 0
            
+
         
     def init_nt_resources(self):        
         
+        self.logger.info(f"Start drivers init")
         self.driver_list = []
-        
-        self.client = httpx.AsyncClient(timeout=httpx.Timeout(20, connect=60),
-                                        limits=httpx.Limits(max_keepalive_connections=None, max_connections=None))
-        
-        with ThreadPoolExecutor(thread_name_prefix="init", max_workers=self._NUM_DRIVERS) as ex:
-            fut = [ex.submit(self.start_driver(i)) for i in range(self._NUM_DRIVERS)]
-            done, pending = wait(fut, return_when=ALL_COMPLETED)
-        
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            for i in range(6):
+                ex.submit(self.start_driver(i))
+                           
+            
+       
              
     
     
     def start_driver(self, key):
+        
+        self.logger.info(f"[{key}] driver init")
         opts = Options()
         opts.headless = True
         driver =  Firefox(options=opts, firefox_profile=self.profiles_firefox[key])
         driver.install_addon("/Users/antoniotorres/projects/comic_getter/myaddon/web-ext-artifacts/myaddon-1.0.zip", temporary=True)
+        waitd = WebDriverWait(driver, 30)
         driver.get("https://readcomiconline.to")
+        waitd.until(ec.title_contains("comic"))
+        self.logger.info(f"[{key}] {driver.title}")
         driver.add_cookie({'name': 'rco_quality','value': 'hq', 'path' : 'readcomiconline.to'})
         driver.add_cookie({'name': 'rco_readType','value': '1', 'path' : 'readcomiconline.to'})
+        #self.driver_list.append(driver)
         self.driver_list[key] = driver
         
     def close_nt_resources(self):
@@ -156,6 +164,9 @@ class RCO_Downloader():
                 file_cache.parent.mkdir(parents=True, exist_ok=True)
                 with open(file_cache, 'w') as f:
                     json.dump(info, f)
+                #self.driver_list[0].close()
+                #self.driver_list[0].quit()
+                #self.driver_list[0] = None
  
                                 
             except Exception as e:
@@ -172,15 +183,18 @@ class RCO_Downloader():
         
         for issue in dl_list:
             if not RCO_Downloader.issue_exists(issue):
-                self.ctx_dl['issues_queue'].put(issue)
+                self.ctx_dl['issues_queue'].put_nowait(issue)
+                
             else:
                 self.logger.info(f"[{issue}] Discarded as already DL")
         
         #tokens KILL and FILLLANDKILL are inserted for the WORKERS PROD
         for _ in range(self._NUM_DRIVERS - 1):
-            self.ctx_dl['issues_queue'].put("KILL")
+            self.ctx_dl['issues_queue'].put_nowait("KILL")
+            
                 
-        self.ctx_dl['issues_queue'].put("FILLANDKILL")
+        self.ctx_dl['issues_queue'].put_nowait("FILLANDKILL")
+        
             
                
     
@@ -202,7 +216,7 @@ class RCO_Downloader():
             pages_links = re.findall(r'push\(\"(https://2\.bp\.blogspot\.com/.*?)\"', el.get_attribute('innerHTML'))
 
             
-            self.logger.debug(f"{comic_name}:{comic_issue}: {pages_links}")
+            self.logger.debug(f"[{i}][get_pages_info]{comic_name}:{comic_issue}: {pages_links}")
         
         except Exception as e:
             self.logger.error(e)
@@ -213,7 +227,8 @@ class RCO_Downloader():
             info_pages = [{'page_num': p+1, 'page_link': link} for p, link in enumerate(pages_links)]
         else: 
             info_pages = []
-            error = -1
+            
+            
             
         issue_data = {"comic": comic_name, "issue": comic_issue, "pages": info_pages, "error": error, "cause": cause}
         
@@ -225,10 +240,11 @@ class RCO_Downloader():
     
     async def worker_prod(self, i):
     
+        self.logger.debug(f"[{i}] WP init") 
         
         while not self.ctx_dl['issues_queue'].empty():
         
-            issue_link = self.ctx_dl['issues_queue'].get()
+            issue_link = await self.ctx_dl['issues_queue'].get()
             self.logger.debug(f"[{i}] {issue_link}")
             if issue_link == "KILL": 
                 self.logger.debug(f"[WP{i}] token KILL")
@@ -253,21 +269,53 @@ class RCO_Downloader():
                                 info = json.load(f)
                         except Exception as e:
                             pass
-                    if not info or info['error'] != 0:
+                        
+                        
+                        
+                    if not info or not info['pages']:
+
                         if not self.driver_list[i]:
-                            self.start_driver(i)
-                        info = self.get_pages_info(issue_link, i)
+                            await self.loop.run_in_executor(ThreadPoolExecutor(), self.start_driver, i)
+                                            
+                        info = await self.loop.run_in_executor(ThreadPoolExecutor(), self.get_pages_info, issue_link, i)
+
                         with open(file_cache, 'w') as f:
                             json.dump(info, f)
+                            
+                        if info['pages']:
+                            
+                            for info_p in info['pages']: 
+                                
+                                #fut = asyncio.run_coroutine_threadsafe(self.ctx_dl['asyncpages_queue'].put({"comic": comic_name, "issue": comic_issue, "page_num": info_p['page_num'], "page_link": info_p['page_link']}), self.loop)
+                                #await asyncio.wait([fut])
+                                self.ctx_dl['asyncpages_queue'].put_nowait({"comic": comic_name, "issue": comic_issue, "page_num": info_p['page_num'], "page_link": info_p['page_link']})                                
+                            self.logger.debug(f"[WP{i}]: PUT {comic_name}:{comic_issue}:TOTAL queue {self.ctx_dl['asyncpages_queue'].qsize()}")
                         
-                        #to avoid RCO website to do not detect this as bot and ban
-                        time.sleep(8)
+                        else:
+                                self.logger.error(f"[{i}] Check profile firefox")
+                                #self.ctx_dl['issues_queue'].put_nowait(issue_link)
+                                #break
+                                self.driversnok += 1
+                                while True:
+                                    if self.ctx_dl['issues_queue'].qsize() == self.driversnok: break
+                                    await asyncio.sleep(0.1)
+                                self.driversnok -= 1
+                                continue
+                        
+                        await asyncio.sleep(8)
+                        continue
                     
-                    if info['error'] == 0:
-                        
-                        for info_p in info['pages']: 
+                    elif info['error'] == 0:
+                            for info_p in info['pages']: 
+                                #fut = asyncio.run_coroutine_threadsafe(self.ctx_dl['asyncpages_queue'].put({"comic": comic_name, "issue": comic_issue, "page_num": info_p['page_num'], "page_link": info_p['page_link']}), self.loop)
+                                #await asyncio.wait([fut])
+                                self.ctx_dl['asyncpages_queue'].put_nowait({"comic": comic_name, "issue": comic_issue, "page_num": info_p['page_num'], "page_link": info_p['page_link']})
                             self.logger.debug(f"[WP{i}]: PUT {comic_name}:{comic_issue}:{info_p['page_num']}")
-                            self.ctx_dl['asyncpages_queue'].put_nowait({"comic": comic_name, "issue": comic_issue, "page_num": info_p['page_num'], "page_link": info_p['page_link']})   
+                                
+                            
+       
+                        
+                           
                         
                 except Exception as e:
                     self.logger.error(e)
@@ -281,17 +329,29 @@ class RCO_Downloader():
     async def asyncdownload_page(self, i):
      
       
-        self.logger.debug(f"[{i}] DL init")    
-    
-        page_data = await self.ctx_dl['asyncpages_queue'].get()         
-    
+        self.logger.debug(f"[DL{i}] DL init")    
+            
+                     
         while True:
+            
+            if  self.ctx_dl['asyncpages_queue'].empty():
+                await asyncio.sleep(0.1)
+                continue
+                      
+            self.logger.debug(f"[DL{i}] DL size queue {self.ctx_dl['asyncpages_queue'].qsize()}")
+            
+            #fut = asyncio.run_coroutine_threadsafe(self.ctx_dl['asyncpages_queue'].get(), self.loop)
+            #d, p = await asyncio.wait([fut]) 
+            #page_data = fut.result()
+            page_data = await self.ctx_dl['asyncpages_queue'].get()
         
+            self.logger.debug(f"[{i}] Start DL {page_data}")
+            
             if page_data == "KILL":
                 self.logger.debug(f"[{i}] token KILL")
                 break
             
-            self.logger.debug(f"[{i}] {page_data}")
+            
             
             try:            
 
@@ -330,8 +390,7 @@ class RCO_Downloader():
                 page_data.update({'page_path': page_path, 'error': -1})
                 self.ctx_dl['res_dl'].append(page_data)
             
-                            
-            page_data = await self.ctx_dl['asyncpages_queue'].get()              
+                                          
             
         
         self.logger.debug(f"[{i}] DL worker bye bye")
@@ -437,7 +496,7 @@ class RCO_Downloader():
 
 
     
-    def makepdfandclean(self, comic):        
+    def makepdfandclean(self, comic, i):        
         
         
         #while not self.ctx_dl['pdf_queue'].empty():
@@ -445,7 +504,7 @@ class RCO_Downloader():
         comic_name = comic[0]
         comic_issue = comic[1]
         pdf_comic_path = Path(RCO_Downloader._MAIN_DIR, comic_name, f"{comic_name}_{comic_issue}.pdf")
-        self.logger.debug(f"{pdf_comic_path}")
+        self.logger.debug(f"[{i}] Start PDF {pdf_comic_path}")
         
         #dir donde están las imágenes base para el pdf
         download_path = Path(RCO_Downloader._MAIN_DIR, comic_name, comic_issue)
@@ -453,14 +512,14 @@ class RCO_Downloader():
         try:
             
             if pdf_comic_path.exists():
-                self.logger.warning(f"PDF File Exist! Skipping : {pdf_comic_path}")
+                self.logger.warning(f"[{i}] PDF File Exist! Skipping : {pdf_comic_path}")
             else:
                 im_files = [str(image) for image in natsorted(download_path.iterdir(), alg=ns.PATH)]
                 with open(pdf_comic_path, "wb") as f:
                     f.write(img2pdf.convert(im_files))
-                    self.logger.debug(f"Conversion to pdf completed")
+                    self.logger.debug(f"[{i}] Conversion to pdf completed")
         except Exception as FileWriteError:
-            self.logger.warning(f"Couldn't write the pdf file..." + str(FileWriteError))            
+            self.logger.warning(f"[{i}] Couldn't write the pdf file..." + str(FileWriteError))            
             if pdf_comic_path.exists():
                 pdf_comic_path.unlink()
             
@@ -471,48 +530,126 @@ class RCO_Downloader():
             #borramos las imágenes
             try:
                 shutil.rmtree(str(download_path))
-                self.logger.debug(f"Removal of issue download folder .. OK") 
+                self.logger.debug(f"[{i}] Removal of issue download folder .. OK") 
             except Exception as OSError:
-                self.logger.warning(f"allo al intentar borrar dir con inmágenes del comic  " + str(OSError))
+                self.logger.warning(f"[{i}] fallo al intentar borrar dir con inmágenes del comic  " + str(OSError))
 
             RCO_Downloader.sanitise(comic_name, comic_issue)
+            self.logger.debug(f"[{i}] Sanitised .. OK")
 
         else:
-            self.logger.warning(f"{str(pdf_comic_path)} ERROR not generated")
+            self.logger.warning(f"[{i}] {str(pdf_comic_path)} ERROR not generated")
 
    
-    async def run(self): 
+    async def run(self, issues_links): 
     
+        self.put_issues_queue(issues_links)
+        
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(20, connect=60),
+                        limits=httpx.Limits(max_keepalive_connections=None, max_connections=None))
+        
         # #loop = asyncio.get_running_loop()
         # ex = ThreadPoolExecutor(thread_name_prefix="comic", max_workers=n_workers)
         # futures_prod = [loop.run_in_executor(ex, self.worker_prod(i)) for i in range(n_workers)]
+         
+        self.loop = asyncio.get_running_loop()
+        
+ 
+        
+        
             
-        async with AioPool(size=self._NUM_DRIVERS+self._NUM_WORKERS_DL) as pool:
+        # async with AioPool(size=self._NUM_DRIVERS+self._NUM_WORKERS_DL) as pool:
 
-            futures_prod = [pool.spawn_n(self.worker_prod(i)) for i in range(self._NUM_DRIVERS)]
-            futures_dl = [pool.spawn_n(self.asyncdownload_page(i)) for i in range(self._NUM_WORKERS_DL)]
+            
+        #     futures_prod = [pool.spawn_n(self.worker_prod(i)) for i in range(self._NUM_DRIVERS)]
+        #     futures_dl = [pool.spawn_n(self.asyncdownload_page(i)) for i in range(self._NUM_WORKERS_DL)]
             
 
-            done, pending = await asyncio.wait(futures_prod + futures_dl, return_when=asyncio.ALL_COMPLETED)
+        #     done, pending = await asyncio.wait(futures_prod + futures_dl, return_when=asyncio.ALL_COMPLETED)
             
-            if pending:
-                try:
-                    await pool.cancel(pending)
-                except Exception as e:
-                    pass
-                await asyncio.gather(*pending, return_exceptions=True)
+        #     if pending:
+        #         try:
+        #             await pool.cancel(pending)
+        #         except Exception as e:
+        #             pass
+        #         await asyncio.gather(*pending, return_exceptions=True)
             
-            if done:
-                for d in done:
-                    try:                        
-                        #d.result()
-                        e = d.exception()  
-                        if e: self.logger.debug(str(e))                            
-                    except Exception as e:
-                        self.logger.debug(str(e), exc_info=True)
-            
-            
+        #     if done:
+        #         for d in done:
+        #             try:                        
+        #                 #d.result()
+        #                 e = d.exception()  
+        #                 if e: self.logger.debug(str(e))                            
+        #             except Exception as e:
+        #                 self.logger.debug(str(e), exc_info=True)
+        
+
+
+        done, pending = await asyncio.wait([self.worker_prod(i) for i in range(self._NUM_DRIVERS)] + [self.asyncdownload_page(i) for i in range(self._NUM_WORKERS_DL)], return_when=asyncio.ALL_COMPLETED)
+        
+        
+        # if done:
+        #     for d in done:
+        #         try:
+        #             e = d.exception()
+        #             if e: self.logger.debug(str(e))
+        #         except Exception as e:
+        #             self.logger.debug(str(e))
+        
         await self.client.aclose()
+        
+        self.close_nt_resources()     
+        
+        comics_to_pdf = self.check_dl_ok()
+                    
+        self.logger.info(f"[COMIC2PDF] : {len(comics_to_pdf)}")
+        self.logger.info(comics_to_pdf)
+        
+        if comics_to_pdf:          
+            
+            
+            async with AioPool(size=10) as pool:
+            
+                fut = [pool.spawn_n(self.loop.run_in_executor(ThreadPoolExecutor(), self.makepdfandclean, comic, i)) for i, comic in enumerate(comics_to_pdf)]
+                
+                done, pending = await asyncio.wait(fut, return_when=asyncio.ALL_COMPLETED)
+                
+                if pending:
+                    try:
+                        await pool.cancel(pending)
+                    except Exception as e:
+                        pass
+                    await asyncio.gather(*pending, return_exceptions=True)
+                
+                if done:
+                    for d in done:
+                        try:                        
+                            #d.result()
+                            e = d.exception()  
+                            if e: self.logger.debug(str(e))                            
+                        except Exception as e:
+                            self.logger.debug(str(e), exc_info=True)
+                   
+                   
+                   
+                   
+                   
+        #tasks = [loop.run_in_executor(None, self.makepdfandclean, comic) for comic in comics_to_pdf]
+         
+        # done, _ = await asyncio.wait(tasks)
+            
+        # if done:
+        #     for d in done:
+        #         try:                        
+        #             #d.result()
+        #             e = d.exception()  
+        #             if e: self.logger.debug(str(e))                            
+        #         except Exception as e:
+        #             self.logger.debug(str(e), exc_info=True)
+           
+
+        
+        
         asyncio.get_running_loop().stop()    
                 
                 

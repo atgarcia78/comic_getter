@@ -69,7 +69,11 @@ def main():
             
             rco_dl = RCO_DL()
             
+            #rco_dl.init_nt_resources()
+                        
             issues_links = rco_dl.get_issues_links(main_url)
+            
+            logger.info(issues_links)
             
             if not issues_links: sys.exit("No se han encontrado ejemplares del cómic")
             
@@ -99,13 +103,11 @@ def main():
                 logger.info("Number of workers: [{}]".format(n_workers))
                 logger.info(issues_links)
    
-            rco_dl.put_issues_queue(issues_links)
+            if issues_links:
             
-            n_workers = rco_dl._NUM_DRIVERS
+                
             
-            if not rco_dl.ctx_dl['issues_queue'].empty():
-            
-                                            
+                                                           
         
                 # with ThreadPoolExecutor(thread_name_prefix="comic", max_workers=n_workers + 1) as ex:
                 
@@ -135,18 +137,18 @@ def main():
             
                 try:
                     
-                    aiorun.run(rco_dl.run(), use_uvloop=True)
+                    aiorun.run(rco_dl.run(issues_links), use_uvloop=True)
                     
-                    rco_dl.close_nt_resources()
-                    comics_to_pdf = rco_dl.check_dl_ok()
                     
-                    logger.info(f"[COMIC2PDF] : {len(comics_to_pdf)}")
-                    logger.info(comics_to_pdf)
+                    # comics_to_pdf = rco_dl.check_dl_ok()
+                    
+                    # logger.info(f"[COMIC2PDF] : {len(comics_to_pdf)}")
+                    # logger.info(comics_to_pdf)
            
-                    ex = ThreadPoolExecutor(max_workers=20) 
-                    futures = [ex.submit(rco_dl.makepdfandclean, comic) for comic in comics_to_pdf]
-                    dones, _= wait(futures, return_when=ALL_COMPLETED)
-                    for d in dones: logger.debug(str(d.exception()))
+                    # ex = ThreadPoolExecutor(max_workers=20) 
+                    # futures = [ex.submit(rco_dl.makepdfandclean, comic) for comic in comics_to_pdf]
+                    # dones, _= wait(futures, return_when=ALL_COMPLETED)
+                    # for d in dones: logger.debug(str(d.exception()))
                     
                     
                     
