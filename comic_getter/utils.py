@@ -81,6 +81,8 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument('--search', action='store_true')
     parser.add_argument('--checkall', type=str)
     parser.add_argument('--loadjson', action='store_true')
+    parser.add_argument('--cache', action='store_true')
+    
 
     #parser.add_argument('--full', action='store_true')
 

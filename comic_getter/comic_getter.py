@@ -11,14 +11,11 @@ from utils import (
     init_argparse    
 )  
 
-from pathlib import Path
 from concurrent.futures import(
     ThreadPoolExecutor,
-    ProcessPoolExecutor,
     wait,
     ALL_COMPLETED,
 )
-
 
 import aiorun
 import asyncio
@@ -67,20 +64,17 @@ def main():
         
             main_url = args.input
             
-            rco_dl = RCO_DL()
+            rco_dl = RCO_DL()          
+
+            issues_links = rco_dl.get_issues_links(main_url, args.cache)
             
-            #rco_dl.init_nt_resources()
-                        
-            issues_links = rco_dl.get_issues_links(main_url)
-            
-            logger.info(issues_links)
+            #logger.info(issues_links)
             
             if not issues_links: sys.exit("No se han encontrado ejemplares del cómic")
             
             skip = args.skip
             if (skip != 0):
                 issues_links = issues_links[skip:]
-                      
 
             #subset of consecutive issues
             first = args.first
@@ -88,80 +82,32 @@ def main():
             if ((first != 0) and (last != 0)):
                 issues_links = issues_links[first-1:last]
 
-        
+
             #single issue
             if args.issue:
                 issues_links = issues_links[args.issue-1:args.issue]
 
-            
-            n_issues = len(issues_links)
 
             n_workers = args.threads
 
             if args.verbose:
-                logger.info("Number of comics: [{}]".format(n_issues))
-                logger.info("Number of workers: [{}]".format(n_workers))
-                logger.info(issues_links)
+                logger.info(f"Number of comics: [{len(issues_links)}]")
+                logger.info(f"Number of workers: [{n_workers}]")
+                #logger.info(issues_links)
    
             if issues_links:
             
-                
-            
-                                                           
-        
-                # with ThreadPoolExecutor(thread_name_prefix="comic", max_workers=n_workers + 1) as ex:
-                
-                #     futures_prod = [ex.submit(rco_dl.worker_prod, i) for i in range(n_workers)]
-                #     #futures_prod = [ex.submit(rco_dl.worker_prod, 0)]
-                #     fut = ex.submit(aiorun.run(rco_dl.async_dl(), use_uvloop=True))
-                
-                #     done, pending = wait([fut] + futures_prod, return_when=ALL_COMPLETED)
-                #     #done, pending = wait(futures_prod, return_when=ALL_COMPLETED)                 
-               
-                #     if pending:
-                #         try:
-                #             ex.shutdown(wait=False, cancel_futures=True)
-                #         except Exception as e:
-                #             pass
-                        
-                                        
-                #     if done:
-                #         for d in done:
-                #             try:                        
-                #                 if d: 
-                #                  exc = d.exception()
-                #                  logger.debug(str(exc))
-                                  
-                #             except Exception as e:
-                #                 logger.debug(str(e), exc_info=True)
-            
                 try:
-                    
-                    aiorun.run(rco_dl.run(issues_links), use_uvloop=True)
-                    
-                    
-                    # comics_to_pdf = rco_dl.check_dl_ok()
-                    
-                    # logger.info(f"[COMIC2PDF] : {len(comics_to_pdf)}")
-                    # logger.info(comics_to_pdf)
-           
-                    # ex = ThreadPoolExecutor(max_workers=20) 
-                    # futures = [ex.submit(rco_dl.makepdfandclean, comic) for comic in comics_to_pdf]
-                    # dones, _= wait(futures, return_when=ALL_COMPLETED)
-                    # for d in dones: logger.debug(str(d.exception()))
-                    
-                    
-                    
+
+                    aiorun.run(rco_dl.run(issues_links), use_uvloop=True)                 
+
                 except Exception as e:
                     logger.warning(f"Fail in pdf and postprocessing  {str(e)}")            
-                
-                    
-            
+
         except Exception as e:
             logger.warning(str(e), exc_info=True)
                   
 
-if __name__ == "__main__":
-    
+if __name__ == "__main__":    
     
     main()
